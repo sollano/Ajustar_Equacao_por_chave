@@ -291,7 +291,7 @@ tab_nlme_talh_par <- cbind(TALHAO_PAR = rownames(tab_nlme_talh_par),as.data.fram
 
 head(tab_nlme_talh_par)
 
-# 5.4) dplyr, broom, tidyr ####
+# 6.4) dplyr, broom, tidyr ####
 
 # Forma mais eficiente de todas, porem, utiliza 3 pacotes
 
@@ -338,7 +338,21 @@ tab_dplyr_broom_talh_par <- full_join(
                                   select(Rsqr = adj.r.squared,  Std.Error = sigma) # Selecao das variaveis
                                        )
 
-# 6.4) Comparar as tabelas geradas ####
+# 6.5) dplyr, purrr, broom ####
+
+dados %>%
+  group_by(TALHAO, PARCELA) %>%
+  nest  %>% # com nest agrupamos os dados a mais em uma lista, resumindo os dados ( a funcao unnest desfaz este ato)
+  mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP, data =.))) %>% # a funcao map aplica uma funcao para cada elemento da lista
+  unnest(map(Reg, glance) ) %>% # funcao glance do pacote broom oferece as estatisticas R2 ajustato e sigma, entre outras. Iremos remover as outras, mas sinta-se livre pra manter as variaveis desejadas
+  select(-p.value, -logLik, -AIC, -BIC, -deviance, -df.residual, -statistic, -p.value, -p.value,-r.squared, -df) %>%
+  unnest(map(Reg, tidy)) %>% # funcao tidy do pacote broom, que nos da os coeficientes e algumas estatisticas adicionais
+  mutate(term = factor(term, labels=c("b0", "b1") ) ) # mudamos os nomes dos coeficientes para b0,b1...bn, para facilitar a manipulacao
+  
+# Esta forma de organizar os dados facilita a manipulacao, pois temos os coeficientes separados por um fator
+
+
+# 6.5) Comparar as tabelas geradas ####
 
 # Podemos testar se as tabelas geradas sao iguais
 # Primeiro argumento Target, segundo argumento Current
