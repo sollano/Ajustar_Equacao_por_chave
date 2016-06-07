@@ -1,6 +1,6 @@
 
 ### Script criado por: Sollano Rabelo Braga e Marcio Leles R. de Oliveira
-#TESTEEEEEEEEEEEEEEEEEE
+
 # Ajuste de equacoes Lineares por Grupos (Chaves)
 
 # Obs: Este ajuste pode ser feito utilizando o R base, dplyr ou nlme;
