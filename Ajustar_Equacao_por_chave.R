@@ -96,33 +96,7 @@ rownames(tab_rbase_talh) <- NULL
 
 head(tab_rbase_talh)
 
-# 5.2) dplyr ####
-
-reg_dplyr_talh <- dados %>% # definicao do df a ser utilizado
-  group_by(TALHAO) %>% # definicao da chave
-  do(Reg = lm(LN_HT ~ INV_DAP + LN_HD, data =.)) # modelo linear
-# obs: em funcoes dplyr, "." representa o dataframe ate aquele ponto do codigo
-
-# o objeto gerado pelo dplyr e mais organizado,
-# e contem a sua chave como primeira coluna, e as regressoes como segunda coluna
-# note que so e possivel pedir o sumario individual de cada observacao
-reg_dplyr_talh
-reg_dplyr_talh$Reg
-summary(reg_dplyr_talh$Reg)
-summary(reg_dplyr_talh$Reg[[1]])
-
-# Criacao da tabela de coeficientes
-# aqui a procedimento se repete como no metodos anterior
-aux <- t(vapply(reg_dplyr_talh$Reg, function(x) c(coef(x), summary(x)$adj.r.squared, summary(x)$sigma), c("b0"=0, "b1"=0, "b2"=0, "Rsqr"=0, "Std.Error"=0)))
-
-# Une-se a coluna chave com o objeto auxiliar gerado anteriormente
-# Nao e necessario que se utilize a funcao as.data.frame() neste caso,
-# porem por precaucao a utilizamos
-tab_dplyr_talh <- cbind(reg_dplyr_talh[1], as.data.frame(aux))
-
-head(tab_dplyr_talh)
-
-# 5.2) dplyr edit-31/05 ####
+# 5.2) dplyr  ####
 
 # Esta e uma forma mais direta de se realizar este procedimento,
 # pois utiliza apenas um pacote, e nao cria nenhum objeto adicional
@@ -148,8 +122,8 @@ tab_dplyr_talh <- reg_dplyr_talh %>%
   mutate(b0=coef(Reg)[1], # a variavel reg, criada anteriormente, possui os coeficientes na ordem,
          b1=coef(Reg)[2], # por isso os extraimos com [], na ordem b0(1), b1(2)...bn(n+1)
          b2=coef(Reg)[3],
-         Rsqr=summary(Reg)$adj.r.squared, # extraimos r quadrado ajustado do summario de Reg
-         Std.Error=summary(Reg)$sigma) %>% # extraimos o erro do summario de Reg
+         Rsqr=summary(Reg)[[9]], # extraimos r quadrado ajustado do summario de Reg
+         Std.Error=summary(Reg)[[6]]) %>% # extraimos o erro do summario de Reg
   select(-Reg) # agora que extraimos as variaveis de interesse, removemos a variavel com os ajustes
 
 
@@ -162,8 +136,8 @@ tab_dplyr_talh <- dados %>% # definicao do df a ser utilizado
   mutate(b0=coef(Reg)[1], # a variavel reg, criada anteriormente, possui os coeficientes na ordem,
          b1=coef(Reg)[2], # por isso os extraimos com [], na ordem b0(1), b1(2)...bn(n+1)
          b2=coef(Reg)[3],
-         Rsqr=summary(Reg)$adj.r.squared, # extraimos r quadrado ajustado do summario de Reg
-         Std.Error=summary(Reg)$sigma) %>% # extraimos o erro do summario de Reg
+         Rsqr=summary(Reg)[[9]], # extraimos r quadrado ajustado do summario de Reg
+         Std.Error=summary(Reg)[[6]]) %>% # extraimos o erro do summario de Reg
   select(-Reg) # agora que extraimos as variaveis de interesse, removemos a variavel com os ajustes
 
 head(tab_dplyr_talh)
@@ -295,8 +269,8 @@ reg_dplyr_talh_par <- dados %>%
   do(Reg = lm(LN_HT ~ INV_DAP, data =.)) %>%
   mutate(b0=coef(Reg)[1], # a variavel reg, criada anteriormente, possui os coeficientes na ordem,
          b1=coef(Reg)[2], # por isso os extraimos com [], na ordem b0(1), b1(2)...bn(n+1)
-         Rsqr=summary(Reg)$adj.r.squared, # extraimos r quadrado ajustado do summario de Reg
-         Std.Error=summary(Reg)$sigma) %>% # extraimos o erro do summario de Reg
+         Rsqr=summary(Reg)[[9]], # extraimos r quadrado ajustado do summario de Reg
+         Std.Error=summary(Reg)[[6]]) %>% # extraimos o erro do summario de Reg
   select(-Reg) # agora que extraimos as variaveis de interesse, removemos a variavel com os ajustes
 
 head(tab_dplyr_talh_par)
