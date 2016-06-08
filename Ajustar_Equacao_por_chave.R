@@ -12,32 +12,41 @@
 # ctrl + shift + o : abre todas as foldings (topicos)
 # ou command + o e command + shift + o, caso utilize o Mac
 
-# 1) Baixar pactoes necessarios ####
+# 1) Baixar e/ou carregar pacotes necessarios ####
 
-#install.packages("xlsx", dependencies=T)
-#install.packages("broom", dependencies=T)
-#install.packages("tidyr", dependencies=T)
-#install.packages("purrr", dependencies=T)
-#install.packages("dplyr", dependencies=T)
-#install.packages("nlme", dependencies=T)
+# Este script contem secoes que podem ser rodadas sem o uso de nenhum pacote adicional
+# no entanto, e interessante se conhecer os metodos alternativos, pois sao de
+# melhor entendimento e facil computacao
+# para isso precisamos dos pacotes instalados e carregados
+# iremos usar uma pequena funcao que ira carregar os pacotes e,
+# caso algum nao esteja instalado na maquina, este sera intalado e carregado
 
-# 2) carregar pacotes necessarios ####
+pkgTest <- function(x)
+{
+  if (!require(x,character.only = TRUE))
+  {
+    install.packages(x,dep=TRUE)
+    if(!require(x,character.only = TRUE)) stop("Pacote nao encontrado")
+  }
+}
 
-require(xlsx)
-require(nlme)
-require(broom)
-require(purrr)
-require(tidyr)
-require(dplyr)
+# Agora que carregamos a funcao, verificamos e carregamos
+# os pacotes que seram utilizados neste script
 
-# 3) Carregar os dados ####
+pkgTest("nlme")
+pkgTest("broom")
+pkgTest("purrr")
+pkgTest("tidyr")
+pkgTest("dplyr")
 
-dados_orig <- read.csv("dados_eq_chave.csv", header = T, sep = ";", dec = ",")
+# 2) Carregar os dados ####
+
+dados_orig <- read.csv2("dados_eq_chave.csv", header = T, sep = ";", dec = ",")
 
 # Salva-se os dados em um objeto separado, removendo seus NAs
 dados <- na.omit(dados_orig)
 
-# 4) Calculo das variaveis necessarias para a regressao ####
+# 3) Calculo das variaveis necessarias para a regressao ####
 
 # Este passo pode ser feito utilizando o R base ou o pacote dplyr
 
@@ -51,10 +60,10 @@ dados$LN_HD <- log(dados$HD)
 # Com o dplyr pode-se criar diversas variaveis com um unico comando
 dados <- mutate(dados, DAP=CAP/pi, INV_DAP=1/DAP, LN_HT=log(HT), Ln_HD=log(HD))
 
-# 5) Ajuste de uma equacao por uma chave ####
+# 4) Ajuste de uma equacao por uma chave ####
 # Ln(Ht) = b0 + b1*((1/DAP)  + b2 * Ln(Hd)
 
-# 5.1) R base ####
+# 4.1) R base ####
 
 # Cria-se um objeto que contem apenas as variaveis da regressao
 # Primeiramente deve se inserir o y, e entao, x1, x2... xn
@@ -97,7 +106,7 @@ rownames(tab_rbase_talh) <- NULL
 
 head(tab_rbase_talh)
 
-# 5.2) dplyr  ####
+# 4.2) dplyr  ####
 
 # Esta e uma forma mais direta de se realizar este procedimento,
 # pois utiliza apenas um pacote, e nao cria nenhum objeto adicional
@@ -143,7 +152,7 @@ tab_dplyr_talh <- dados %>% # definicao do df a ser utilizado
 
 head(tab_dplyr_talh)
 
-# 5.3) nlme ####
+# 4.3) nlme ####
 
 # a funcao lnList comporta-se de maneira similiar a lm,
 # porem podemos inserir uma chave apos a formula;
@@ -177,7 +186,7 @@ rownames(tab_nlme_talh) <- NULL
 
 head(tab_nlme_talh)
 
-# 5.4) dplyr, purrr, broom, tidyr ####
+# 4.4) dplyr, purrr, broom, tidyr ####
 
 # Forma mais eficiente de todas, porem, utiliza 3 pacotes
 # Utilizando s pacotes broom e tidyr, em conjunto com dplyr, podemos fazer isto de forma direta, sem a funcao vapply, e de forma organizada
@@ -211,7 +220,7 @@ tab_dplyr_broom_talh <- dados %>%  # definicao do df
   select(-std.error, -statistic, -p.value)  %>%  # removemos variaveis
   spread(term, estimate) # com tidyr::spread separamos os coeficientes por coluna, para facilitar os calculos
 
-# 5.5) Comparar as tabelas geradas ####
+# 4.5) Comparar as tabelas geradas ####
 
 # Podemos testar se as tabelas geradas sao iguais
 # Primeiro argumento Target, segundo argumento Current
@@ -222,10 +231,10 @@ all.equal(tab_nlme_talh, tab_dplyr_talh)
 # Aqui recebemos o aviso de que a variavel TALHAO possui a classe diferente
 # Os demais dados sao os mesmos, ou seja, os valores estimados sao identicos
 
-# 6) Ajuste de uma equacao por duas ou mais chaves ####
+# 5) Ajuste de uma equacao por duas ou mais chaves ####
 # Ln(Ht) = b0 + b1*((1/DAP)
 
-# 6.1) R base ####
+# 5.1) R base ####
 
 # O procedimento e o mesmo do anterior, porem 
 # Deve-se unir as chaves em uma unica variavel
@@ -246,7 +255,7 @@ row.names(tab_rbase_talh_par) <- NULL
 
 head(tab_rbase_talh_par)
 
-# 6.2) dplyr ####
+# 5.2) dplyr ####
 
 # Nao ha a necessidade de criar uma chave adicional,
 # basta informar as chaves desejadas na funcao group_by()
@@ -263,7 +272,7 @@ reg_dplyr_talh_par <- dados %>%
 
 head(tab_dplyr_talh_par)
 
-# 6.3) nlme ####
+# 5.3) nlme ####
 
 # Assim como no R base, deve-se criar uma chave que represente as demais
 dados2 <- within(dados, TALHAO_PAR <- paste(TALHAO, PARCELA, sep='_'))
@@ -279,7 +288,7 @@ tab_nlme_talh_par <- cbind(TALHAO_PAR = rownames(tab_nlme_talh_par),as.data.fram
 
 head(tab_nlme_talh_par)
 
-# 6.4) dplyr, purrr, broom, tidyr ####
+# 5.4) dplyr, purrr, broom, tidyr ####
 
 # Forma mais eficiente de todas, porem, utiliza 4 pacotes
 
@@ -311,7 +320,7 @@ tab_dplyr_broom_talh_par <- dados %>%  # definicao do df
   select(-std.error, -statistic, -p.value)  %>%  # removemos variaveis
   spread(term, estimate) # com tidyr::spread separamos os coeficientes por coluna, para facilitar os calculos
 
-# 6.5) Comparar as tabelas geradas ####
+# 5.5) Comparar as tabelas geradas ####
 
 # Podemos testar se as tabelas geradas sao iguais
 # Primeiro argumento Target, segundo argumento Current
@@ -324,7 +333,7 @@ all.equal(tab_nlme_talh_par[,c(2,3,4,5)], tab_dplyr_talh_par[,c(3,4,5,6)])
 # Recebemos o aviso de a classe dos nomes das colunas sao diferentes
 # Porem nao recebemos nenhum outro aviso, ou seja, os dados gerados sao identicos
 
-# 7) Exportar tabelas de coeficientes ####
+# 6) Exportar tabelas de coeficientes ####
 
 write.csv2(tab_rbase_talh, file.choose())
 write.csv2(tab_rbase_talh_par, file.choose())
@@ -338,13 +347,13 @@ write.csv2(tab_nlme_talh_par, file.choose())
 write.csv2(tab_dplyr_broom_talh, file.choose())
 write.csv2(tab_dplyr_broom_talh_par, file.choose())
 
-# 8) Juncao dos dados originais e dados de regressao ####
+# 7) Juncao dos dados originais e dados de regressao ####
 
-# 8.1) Importar dados ####
+# 7.1) Importar dados ####
 
 #tab_reg <- read.csv(file.choose(), header = T)
 
-# 8.2) R base ####
+# 7.2) R base ####
 
 # Caso os dados nao possuam a chave utilizada na regressao,
 # devemos adiciona-la
@@ -364,7 +373,7 @@ tab_final_rbase_talh_par[is.na(tab_final_rbase_talh_par)] <- 0
 head(tab_final_rbase_talh)
 head(tab_final_rbase_talh_par)
 
-# 8.3) dplyr ####
+# 7.3) dplyr ####
 
 # Com o pacote dplyr nao e necessario unir as chaves:
 # caso elas nao existam, devem ser adicionadas 
@@ -386,11 +395,12 @@ tab_final_dplyr_talh_par[is.na(tab_final_dplyr_talh_par)] <- 0
 head(tab_final_dplyr_talh)
 head(tab_final_dplyr_talh_par)
 
-# Podemos verificar se as tabelas finais sao iguais: ####
+
+# Podemos verificar se as tabelas finais sao iguais:
 all.equal(tab_final_dplyr_talh, tab_final_rbase_talh)
 # Recebos a resposta TRUE, ou seja, as tabelas sao identicas
 
-# 9) Exportar tabelas finais ####
+# 8) Exportar tabelas finais ####
 
 write.csv(tab_final_rbase_talh, file.choose())
 write.xlsx2(tab_final_rbase_talh, file.choose())
