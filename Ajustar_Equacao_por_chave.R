@@ -14,20 +14,21 @@
 
 # 1) Baixar pactoes necessarios ####
 
-#install.packages("xlsx")
-#install.packages("tidyr")
-#install.packages("dplyr")
-#install.packages("nlme")
-#install.packages("broom")
+#install.packages("xlsx", dependencies=T)
+#install.packages("broom", dependencies=T)
+#install.packages("tidyr", dependencies=T)
+#install.packages("purrr", dependencies=T)
+#install.packages("dplyr", dependencies=T)
+#install.packages("nlme", dependencies=T)
 
 # 2) carregar pacotes necessarios ####
 
 require(xlsx)
 require(nlme)
+require(broom)
+require(purrr)
 require(tidyr)
 require(dplyr)
-require(broom)
-
 
 # 3) Carregar os dados ####
 
@@ -176,7 +177,7 @@ rownames(tab_nlme_talh) <- NULL
 
 head(tab_nlme_talh)
 
-# 5.4) dplyr, broom, tidyr ####
+# 5.4) dplyr, purrr, broom, tidyr ####
 
 # Forma mais eficiente de todas, porem, utiliza 3 pacotes
 # Utilizando s pacotes broom e tidyr, em conjunto com dplyr, podemos fazer isto de forma direta, sem a funcao vapply, e de forma organizada
@@ -186,42 +187,29 @@ head(tab_nlme_talh)
 # Sua desvantagem e que caso algum destes pacote seja atualizado de forma que altere as funcoes utilizadas,
 # talvez o codigo deixe de funcionar
 
-tab_dplyr_broom_talh <- dados %>% # definicao do df a ser utilizado
-  group_by(TALHAO) %>% # definicao da chave
-  do(Reg = lm(LN_HT ~ INV_DAP + LN_HD, data =.)) %>% # modelo linear
-  tidy(Reg) %>% # funcao do pacote broom que transforma a variavel Reg em 4 colunas, onde se tem informacoes sobre os coeficientes de forma agrupada
-  select(-statistic, -p.value, -std.error) %>% # como apenas os coeficientes nos interessam, removemos as demais
-  mutate(term = factor(term, labels=c("b0", "b1", "b2") ) ) %>% # mudamos os nomes dos coeficientes para b0,b1...bn, para facilitar a manipulacao
-  spread(term, estimate) # funcao do pacote plyr, em que separamos a coluna de coeficientes em colunas separadas
-
-# Para se obter as variaveis de qualidade do ajuste, o codigo fica maior, porem
-# para se obter apenas os coeficientes, o codigo fica muito mais simples
-# e por estar dentro do pipe, pode ser seguido de mais linhas
-
 # Nao obtemos o r ajustado e o erro, caso seja desejado, eles podem ser obtidos atravez da funcao glance
+# Esta forma de organizar os dados facilita a manipulacao, pois temos os coeficientes separados por um fator
 
-dados %>% # definicao do df a ser utilizado
-  group_by(TALHAO) %>% # definicao da chave
-  do(Reg = lm(LN_HT ~ INV_DAP + LN_HD, data =.)) %>% # modelo linear
-  glance(Reg)
+tab_dplyr_broom_talh <- dados %>%  # definicao do df
+  group_by(TALHAO) %>% # definicao dos grupos
+  nest  %>% # com tidyr::nest agrupamos os dados a mais em uma lista, resumindo os dados ( a funcao unnest desfaz este ato)
+  mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP + LN_HD, data =.))) %>% # a funcao purrr::map aplica uma funcao para cada elemento da lista
+  unnest(map(Reg, glance) ) %>% # a funcao broom::glance oferece as estatisticas R2 ajustato e sigma, entre outras. Iremos remover as outras, mas sinta-se livre pra manter as variaveis desejadas
+  select(-p.value, -logLik, -AIC, -BIC, -deviance, -df.residual, -statistic, -p.value, -p.value,-r.squared, -df) %>%
+  unnest(map(Reg, tidy)) %>% # a funcao broom:tidy nos da os coeficientes e algumas estatisticas adicionais
+  mutate(term = factor(term, labels=c("b0", "b1", "b2") ) )
 
-# unindo ambas as linhas via funcao join, obtemos 
-
-tab_dplyr_broom_talh <- full_join( 
-              dados %>% # definicao do df a ser utilizado
-              group_by(TALHAO) %>% # definicao da chave
-              do(Reg = lm(LN_HT ~ INV_DAP + LN_HD, data =.)) %>% # modelo linear
-              tidy(Reg) %>% # funcao do pacote broom que transforma a variavel Reg em 4 colunas, onde se tem informacoes sobre os coeficientes de forma agrupada
-              select(-statistic, -p.value, -std.error) %>% # como apenas os coeficientes nos interessam, removemos as demais
-              mutate(term = factor(term, labels=c("b0", "b1", "b2") ) ) %>% # mudamos os nomes dos coeficientes para bn, para facilitar a manipulacao
-              spread(term, estimate) 
-                                      ,  
-                                        dados %>% # definicao do df a ser utilizado
-                                        group_by(TALHAO) %>% # definicao da chave
-                                        do(Reg = lm(LN_HT ~ INV_DAP + LN_HD, data =.)) %>% # modelo linear
-                                        glance(Reg) %>% # Funcao broom para obter R quadrado e o erro
-                                        select(Rsqr = adj.r.squared,  Std.Error = sigma) # Selecao das variaveis
-                             )
+# Aqui utilizando spread, deixamos os dados de maneira semelhante aos outros metodos
+tab_dplyr_broom_talh <- dados %>%  # definicao do df
+  group_by(TALHAO) %>% # definicao dos grupos
+  nest  %>% # com tidyr::nest agrupamos os dados a mais em uma lista, resumindo os dados ( a funcao unnest desfaz este ato)
+  mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP + LN_HD, data =.))) %>% # a funcao purrr::map aplica uma funcao para cada elemento da lista
+  unnest(map(Reg, glance) ) %>% # a funcao broom::glance oferece as estatisticas R2 ajustato e sigma, entre outras. Iremos remover as outras, mas sinta-se livre pra manter as variaveis desejadas
+  select(-p.value, -logLik, -AIC, -BIC, -deviance, -df.residual, -statistic, -p.value, -p.value,-r.squared, -df) %>%
+  unnest(map(Reg, tidy)) %>% # a funcao broom:tidy nos da os coeficientes e algumas estatisticas adicionais
+  mutate(term = factor(term, labels=c("b0", "b1", "b2") ) ) %>%  # mudamos os nomes dos coeficientes para b0,b1...bn, para facilitar a manipulacao
+  select(-std.error, -statistic, -p.value)  %>%  # removemos variaveis
+  spread(term, estimate) # com tidyr::spread separamos os coeficientes por coluna, para facilitar os calculos
 
 # 5.5) Comparar as tabelas geradas ####
 
@@ -291,66 +279,37 @@ tab_nlme_talh_par <- cbind(TALHAO_PAR = rownames(tab_nlme_talh_par),as.data.fram
 
 head(tab_nlme_talh_par)
 
-# 6.4) dplyr, broom, tidyr ####
+# 6.4) dplyr, purrr, broom, tidyr ####
 
-# Forma mais eficiente de todas, porem, utiliza 3 pacotes
+# Forma mais eficiente de todas, porem, utiliza 4 pacotes
 
-# Sua desvantagem e que caso algum destes pacote seja atualizado de forma que altere as funcoes utilizadas,
+# Sua desvantagem e que caso algum destes pacotes seja atualizado de forma que altere as funcoes utilizadas,
 # talvez o codigo deixe de funcionar
 
 # Como utilizamos dplyr, simplesmente adicionamos a nova variavel no group_by
-# O resto se comporta da mesma forma
+# O resto se comporta da mesma forma mostrada anteriormente
 
-tab_dplyr_broom_talh_par <- dados %>%
-  group_by(TALHAO, PARCELA) %>%
-  do(Reg = lm(LN_HT ~ INV_DAP, data =.)) %>% # modelo linear
-  tidy(Reg) %>% # funcao do pacote broom que transforma a variavel Reg em 4 colunas, onde se tem informacoes sobre os coeficientes de forma agrupada
-  select(-statistic, -p.value, -std.error) %>% # como apenas os coeficientes nos interessam, removemos as demais
-  mutate(term = factor(term, labels=c("b0", "b1") ) ) %>% # mudamos os nomes dos coeficientes para bn, para facilitar a manipulacao
-  spread(term, estimate) # funcao do pacote plyr, em que separamos a coluna de coeficientes em colunas separadas
-
-# Para se obter as variaveis de qualidade do ajuste, o codigo fica maior, porem
-# para se obter apenas os coeficientes, o codigo fica muito mais simples
-# e por estar dentro do pipe, pode ser seguido de mais linhas
-
-# Nao obtemos o r ajustado e o erro, caso seja desejado, eles podem ser obtidos atravez da funcao glance
-
-dados %>%
-  group_by(TALHAO, PARCELA) %>%
-  do(Reg = lm(LN_HT ~ INV_DAP, data =.)) %>% # modelo linear
-  glance(Reg)
-
-# unindo ambas as linhas via funcao join, obtemos 
-
-tab_dplyr_broom_talh_par <- full_join( 
-    dados %>%
-    group_by(TALHAO, PARCELA) %>%
-    do(Reg = lm(LN_HT ~ INV_DAP, data =.)) %>% # modelo linear
-    tidy(Reg) %>% # funcao do pacote broom que transforma a variavel Reg em 4 colunas, onde se tem informacoes sobre os coeficientes de forma agrupada
-    select(-statistic, -p.value, -std.error) %>% # como apenas os coeficientes nos interessam, removemos as demais
-    mutate(term = factor(term, labels=c("b0", "b1") ) ) %>% # mudamos os nomes dos coeficientes para bn, para facilitar a manipulacao
-    spread(term, estimate) 
-                               ,  
-                                  dados %>%
-                                  group_by(TALHAO, PARCELA) %>%
-                                  do(Reg = lm(LN_HT ~ INV_DAP, data =.)) %>% # modelo linear
-                                  glance(Reg) %>% # Funcao broom para obter R quadrado e o erro
-                                  select(Rsqr = adj.r.squared,  Std.Error = sigma) # Selecao das variaveis
-                                       )
-
-# 6.5) dplyr, purrr, broom ####
-
-dados %>%
-  group_by(TALHAO, PARCELA) %>%
-  nest  %>% # com nest agrupamos os dados a mais em uma lista, resumindo os dados ( a funcao unnest desfaz este ato)
-  mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP, data =.))) %>% # a funcao map aplica uma funcao para cada elemento da lista
-  unnest(map(Reg, glance) ) %>% # funcao glance do pacote broom oferece as estatisticas R2 ajustato e sigma, entre outras. Iremos remover as outras, mas sinta-se livre pra manter as variaveis desejadas
-  select(-p.value, -logLik, -AIC, -BIC, -deviance, -df.residual, -statistic, -p.value, -p.value,-r.squared, -df) %>%
-  unnest(map(Reg, tidy)) %>% # funcao tidy do pacote broom, que nos da os coeficientes e algumas estatisticas adicionais
-  mutate(term = factor(term, labels=c("b0", "b1") ) ) # mudamos os nomes dos coeficientes para b0,b1...bn, para facilitar a manipulacao
-  
 # Esta forma de organizar os dados facilita a manipulacao, pois temos os coeficientes separados por um fator
+tab_dplyr_broom_talh_par <- dados %>% # definicao do df
+  group_by(TALHAO, PARCELA) %>% # definicao dos grupos
+  nest  %>% # com tidyr::nest agrupamos os dados a mais em uma lista, resumindo os dados ( a funcao unnest desfaz este ato)
+  mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP, data =.))) %>% # a funcao purrr::map aplica uma funcao para cada elemento da lista
+  unnest(map(Reg, glance) ) %>% # a funcao broom::glance oferece as estatisticas R2 ajustato e sigma, entre outras. Iremos remover as outras, mas sinta-se livre pra manter as variaveis desejadas
+  select(-p.value, -logLik, -AIC, -BIC, -deviance, -df.residual, -statistic, -p.value, -p.value,-r.squared, -df) %>%
+  unnest(map(Reg, tidy)) %>% # a funcao broom:tidy nos da os coeficientes e algumas estatisticas adicionais
+  mutate(term = factor(term, labels=c("b0", "b1") ) )  # com tidyr::spread separamos os coeficientes por coluna, para facilitar os calculos
 
+# Aqui utilizando spread, deixamos os dados de maneira semelhante aos outros metodos
+tab_dplyr_broom_talh_par <- dados %>%  # definicao do df
+  group_by(TALHAO, PARCELA) %>% # definicao dos grupos
+  nest  %>% # com tidyr::nest agrupamos os dados a mais em uma lista, resumindo os dados ( a funcao unnest desfaz este ato)
+  mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP, data =.))) %>% # a funcao purrr::map aplica uma funcao para cada elemento da lista
+  unnest(map(Reg, glance) ) %>% # a funcao broom::glance oferece as estatisticas R2 ajustato e sigma, entre outras. Iremos remover as outras, mas sinta-se livre pra manter as variaveis desejadas
+  select(-p.value, -logLik, -AIC, -BIC, -deviance, -df.residual, -statistic, -p.value, -p.value,-r.squared, -df) %>%
+  unnest(map(Reg, tidy)) %>% # a funcao broom:tidy nos da os coeficientes e algumas estatisticas adicionais
+  mutate(term = factor(term, labels=c("b0", "b1") ) ) %>%  # mudamos os nomes dos coeficientes para b0,b1...bn, para facilitar a manipulacao
+  select(-std.error, -statistic, -p.value)  %>%  # removemos variaveis
+  spread(term, estimate) # com tidyr::spread separamos os coeficientes por coluna, para facilitar os calculos
 
 # 6.5) Comparar as tabelas geradas ####
 
