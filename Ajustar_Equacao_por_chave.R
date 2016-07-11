@@ -415,7 +415,7 @@ write.xlsx2(tab_final_dplyr_talh_par, file.choose())
 
 
 
-# Chamar residuos ####
+# Chamar residuos (tidyr, dplyr, purrr) ####
 
 dados %>%  # definicao do df
   group_by(TALHAO) %>% # definicao dos grupos
