@@ -214,6 +214,9 @@ tibble_talh <- dados %>% # definicao do df
                       function(x) tibble( Rsqr=glance(x)$adj.r.squared, # coluna do R2 ajustado
                                           Std.Error=glance(x)$sigma )    )      ) # coluna do erro-padrao
 
+
+
+
 # Porem, ainda temos o problema d eque tidy nos da os coeficientes organizados por fator
 # e quisermos os coeficientes organizados por coluna, podemos utilizar spread dentro da funcao criada anteriormente
 
@@ -224,17 +227,39 @@ tibble_talh <- dados %>% # definicao do df
          Coefs = map(Reg, 
                      function(x) 
                        spread( # com spread deixamos a tabela horizontal, colocando cada coeficiente em uma coluna
-                         tibble(term=tidy(x)$term, 
+                         tibble(b=tidy(x)$term, 
                                 estimate=tidy(x)$estimate ) %>% 
-                           mutate(term = factor(term, labels=c("b0", "b1", "b2") ) ), # mudamos os nomes dos coeficientes para bn
-                         term, estimate # variaveis que seram utilizadas no spread
+                           mutate(b = factor(b, labels=0:(length(b)-1) ) ), # mudamos os nomes dos coeficientes para bn
+                         b, estimate,sep="" # variaveis que seram utilizadas no spread
                        ) ),
          Glance = map(Reg, 
                       function(x) tibble( Rsqr=glance(x)$adj.r.squared, 
                                           Std.Error=glance(x)$sigma )    ),
          Res = map(Reg, resid) ) # a funcao resid cria um vetor com os valores residuais do ajuste
 
+# ou, se salvarmos esta funcao em um objeto separado
 
+tidys <- function(x) 
+{spread( # com spread deixamos a tabela horizontal, colocando cada coeficiente em uma coluna
+  tibble(b=tidy(x)$term, 
+         estimate=tidy(x)$estimate ) %>% 
+    mutate(b = factor(b, labels=0:(length(b)-1) ) ), # mudamos os nomes dos coeficientes para bn
+  b, estimate,sep="" # variaveis que seram utilizadas no spread
+) }
+
+
+tibble_talh <- dados %>% # definicao do df
+  group_by(TALHAO) %>% # definicao dos grupos
+  nest  %>% # com tidyr::nest agrupamos os dados a mais em uma lista, resumindo os dados ( a funcao unnest desfaz este ato)
+  mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP + LN_HD, data =.)), # a funcao purrr::map aplica uma funcao para cada elemento da lista
+         Coefs = map(Reg, tidys ),
+         Glance = map(Reg, 
+                      function(x) tibble( Rsqr=glance(x)$adj.r.squared, 
+                                          Std.Error=glance(x)$sigma )    ),
+         Res = map(Reg, resid) ) # a funcao resid cria um vetor com os valores residuais do ajuste
+
+# a vantagem deste metodo e que nao e necessaria a definicao dos nomes de cada coeficiente
+# deixando a funcao automatizada para qualquer modelo, com n coeficientes
 
 tibble_talh
 # Observe como cada coluna é uma lista que agrupa diferentes variaveis, com dimensoes diferentes
@@ -361,16 +386,39 @@ tibble_talh_par <- dados %>% # definicao do df
          Coefs = map(Reg, 
                      function(x) 
                        spread( # com spread deixamos a tabela horizontal, colocando cada coeficiente em uma coluna
-                         tibble(term=tidy(x)$term, 
+                         tibble(b=tidy(x)$term, 
                                 estimate=tidy(x)$estimate ) %>% 
-                           mutate(term = factor(term, labels=c("b0", "b1") ) ), # mudamos os nomes dos coeficientes para bn
-                         term, estimate # variaveis que seram utilizadas no spread
+                           mutate(b = factor(b, labels=0:(length(b)-1) ) ), # mudamos os nomes dos coeficientes para bn
+                         b, estimate,sep="" # variaveis que seram utilizadas no spread
                        ) ),
          Glance = map(Reg, 
                       function(x) tibble( Rsqr=glance(x)$adj.r.squared, 
                                           Std.Error=glance(x)$sigma )    ),
          Res = map(Reg, resid) ) # a funcao resid cria um vetor com os valores residuais do ajuste
 
+# ou, se salvarmos esta funcao mais complexa separadamente,
+
+tidys <- function(x) 
+{spread( # com spread deixamos a tabela horizontal, colocando cada coeficiente em uma coluna
+  tibble(b=tidy(x)$term, 
+         estimate=tidy(x)$estimate ) %>% 
+    mutate(b = factor(b, labels=0:(length(b)-1) ) ), # mudamos os nomes dos coeficientes para bn
+  b, estimate,sep="" # variaveis que seram utilizadas no spread
+) }
+
+
+tibble_talh_par <- dados %>% # definicao do df
+  group_by(TALHAO, PARCELA) %>% # definicao dos grupos
+  nest  %>% # com tidyr::nest agrupamos os dados a mais em uma lista, resumindo os dados ( a funcao unnest desfaz este ato)
+  mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP, data =.)),
+         Coefs = map(Reg, tidys ),
+         Glance = map(Reg, 
+                      function(x) tibble( Rsqr=glance(x)$adj.r.squared, 
+                                          Std.Error=glance(x)$sigma )    ),
+         Res = map(Reg, resid) ) # a funcao resid cria um vetor com os valores residuais do ajuste
+
+# a vantagem deste metodo e que nao e necessaria a definicao dos nomes de cada coeficiente
+# deixando a funcao automatizada para qualquer modelo, com n coeficientes
 
 
 tibble_talh_par
