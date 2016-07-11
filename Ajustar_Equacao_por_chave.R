@@ -420,7 +420,8 @@ write.xlsx2(tab_final_dplyr_talh_par, file.choose())
 dados %>%  # definicao do df
   group_by(TALHAO) %>% # definicao dos grupos
   nest  %>% # com tidyr::nest agrupamos os dados a mais em uma lista, resumindo os dados ( a funcao unnest desfaz este ato)
-  mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP + LN_HD, data =.)), 
-         Res = map(Reg, resid ) )
+  mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP + LN_HD, data =.)),  # map gera objetos dentro de um nest, ou seja, em forma de lista, por grupo
+         Res = map(Reg, resid ) ) %>%
+  unnest(data, Res, .drop=F) # reverte os dados ao estado original; .drop=F Mantem a coluna com o ajuste feito anteriormente
 
 
