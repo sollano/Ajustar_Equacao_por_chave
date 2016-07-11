@@ -413,3 +413,14 @@ write.csv(tab_final_dplyr_talh_par, file.choose())
 write.xlsx2(tab_final_dplyr_talh_par, file.choose())
 
 
+
+
+# Chamar residuos ####
+
+dados %>%  # definicao do df
+  group_by(TALHAO) %>% # definicao dos grupos
+  nest  %>% # com tidyr::nest agrupamos os dados a mais em uma lista, resumindo os dados ( a funcao unnest desfaz este ato)
+  mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP + LN_HD, data =.)), 
+         Res = map(Reg, resid ) )
+
+
