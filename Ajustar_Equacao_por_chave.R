@@ -215,8 +215,6 @@ tibble_talh <- dados %>% # definicao do df
                                           Std.Error=glance(x)$sigma )    )      ) # coluna do erro-padrao
 
 
-
-
 # Porem, ainda temos o problema d eque tidy nos da os coeficientes organizados por fator
 # e quisermos os coeficientes organizados por coluna, podemos utilizar spread dentro da funcao criada anteriormente
 
@@ -226,12 +224,12 @@ tibble_talh <- dados %>% # definicao do df
   mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP + LN_HD, data =.)), # a funcao purrr::map aplica uma funcao para cada elemento da lista
          Coefs = map(Reg, 
                      function(x) 
-                       spread( # com spread deixamos a tabela horizontal, colocando cada coeficiente em uma coluna
-                         tibble(b=tidy(x)$term, 
-                                estimate=tidy(x)$estimate ) %>% 
-                           mutate(b = factor(b, labels=0:(length(b)-1) ) ), # mudamos os nomes dos coeficientes para bn
+                       tibble(b=tidy(x)$term, 
+                              estimate=tidy(x)$estimate ) %>% 
+                       mutate(b = factor(b, labels=0:(length(b)-1) ) ) %>% # mudamos os nomes dos coeficientes para bn
+                       spread(                    # com spread deixamos a tabela horizontal, colocando cada coeficiente em uma coluna
                          b, estimate,sep="" # variaveis que seram utilizadas no spread
-                       ) ),
+                       )  ),
          Glance = map(Reg, 
                       function(x) tibble( Rsqr=glance(x)$adj.r.squared, 
                                           Std.Error=glance(x)$sigma )    ),
@@ -240,12 +238,14 @@ tibble_talh <- dados %>% # definicao do df
 # ou, se salvarmos esta funcao em um objeto separado
 
 tidys <- function(x) 
-{spread( # com spread deixamos a tabela horizontal, colocando cada coeficiente em uma coluna
+{
   tibble(b=tidy(x)$term, 
          estimate=tidy(x)$estimate ) %>% 
-    mutate(b = factor(b, labels=0:(length(b)-1) ) ), # mudamos os nomes dos coeficientes para bn
-  b, estimate,sep="" # variaveis que seram utilizadas no spread
-) }
+    mutate(b = factor(b, labels=0:(length(b)-1) ) ) %>% # mudamos os nomes dos coeficientes para bn
+    spread(                    # com spread deixamos a tabela horizontal, colocando cada coeficiente em uma coluna
+      b, estimate,sep="" # variaveis que seram utilizadas no spread
+    ) 
+}
 
 
 tibble_talh <- dados %>% # definicao do df
@@ -385,12 +385,12 @@ tibble_talh_par <- dados %>% # definicao do df
   mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP, data =.)),
          Coefs = map(Reg, 
                      function(x) 
-                       spread( # com spread deixamos a tabela horizontal, colocando cada coeficiente em uma coluna
-                         tibble(b=tidy(x)$term, 
-                                estimate=tidy(x)$estimate ) %>% 
-                           mutate(b = factor(b, labels=0:(length(b)-1) ) ), # mudamos os nomes dos coeficientes para bn
+                       tibble(b=tidy(x)$term, 
+                              estimate=tidy(x)$estimate ) %>% 
+                       mutate(b = factor(b, labels=0:(length(b)-1) ) ) %>% # mudamos os nomes dos coeficientes para bn
+                       spread(                    # com spread deixamos a tabela horizontal, colocando cada coeficiente em uma coluna
                          b, estimate,sep="" # variaveis que seram utilizadas no spread
-                       ) ),
+                       )  ),
          Glance = map(Reg, 
                       function(x) tibble( Rsqr=glance(x)$adj.r.squared, 
                                           Std.Error=glance(x)$sigma )    ),
@@ -399,12 +399,14 @@ tibble_talh_par <- dados %>% # definicao do df
 # ou, se salvarmos esta funcao mais complexa separadamente,
 
 tidys <- function(x) 
-{spread( # com spread deixamos a tabela horizontal, colocando cada coeficiente em uma coluna
+{
   tibble(b=tidy(x)$term, 
          estimate=tidy(x)$estimate ) %>% 
-    mutate(b = factor(b, labels=0:(length(b)-1) ) ), # mudamos os nomes dos coeficientes para bn
-  b, estimate,sep="" # variaveis que seram utilizadas no spread
-) }
+    mutate(b = factor(b, labels=0:(length(b)-1) ) ) %>% # mudamos os nomes dos coeficientes para bn
+  spread(                    # com spread deixamos a tabela horizontal, colocando cada coeficiente em uma coluna
+          b, estimate,sep="" # variaveis que seram utilizadas no spread
+                             ) 
+  }
 
 
 tibble_talh_par <- dados %>% # definicao do df
