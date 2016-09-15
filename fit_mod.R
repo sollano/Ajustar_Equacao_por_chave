@@ -4,12 +4,11 @@ fit_mod <- function(df, model, name = "EST", EANM = T ,Y = "HT", lnmodel=T){
   
   VARSX <- all.vars(MODEL[[3]]) # todas as variaveis do lado x do modelo
   
-  
   COEF_N <- length( VARSX )  # numero de coeficientes alem do beta0
   
   # criamos um data frame vazio, com o numero de linhas do df original,
   # e o numero de colunas de coef.
-  data <- data.frame(matrix(data= NA, nrow = nrow(df), ncol = COEF_N ))
+  data <- data.frame(matrix(data=NA, nrow = nrow(df), ncol = COEF_N ))
 
   # isso e necessario pois iremos preencher este dataframe com
   # com a multiplicacao de cada beta e sua respectiva variavel
@@ -27,7 +26,7 @@ fit_mod <- function(df, model, name = "EST", EANM = T ,Y = "HT", lnmodel=T){
   # para finalizar o modelo, temos que somar o resultado do for,
   # com o beta zero
   
-  # 1 aplica a funcao sum para todas as linhas
+  # aplica a funcao sum para todas as linhas e converte em vetor
   EST <- do.call(rbind, as.list( rowSums(data) )  )
   
   # se o y do modelo for logaritimico, tiramos o ln com exp

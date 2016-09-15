@@ -7,6 +7,20 @@ require("dplyr")
   
 mod <- formula(modelo)
 
+tidy_ <- function(x){
+  tibble(b=tidy(x)$term, # criamos um data frame que tem apenas as colunas dos betas e seus valores
+         estimate=tidy(x)$estimate ) %>% 
+    mutate(b = factor(b, labels=0:(length(b)-1) ) ) %>% # mudamos os nomes dos coeficientes para bn
+    spread( b, estimate,sep="" )     # com spread deixamos a tabela horizontal, colocando cada coeficiente em uma coluna
+  
+}
+
+glance_ <- function(x){ 
+  
+  tibble( Rsqr=glance(x)$adj.r.squared, # criamos um data table que tem apenas as variaveis R quadrado ajustado e erro padrao
+          Std.Error=glance(x)$sigma ) }
+
+
 x <- df %>% 
   ungroup %>% 
   group_by_(.dots = groups ) %>% 
