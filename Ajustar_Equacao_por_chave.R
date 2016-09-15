@@ -21,8 +21,7 @@
 # iremos usar uma pequena funcao que ira carregar os pacotes e,
 # caso algum nao esteja instalado na maquina, este sera intalado e carregado
 
-pkgTest <- function(x)
-{
+pkgTest <- function(x){
   if (!require(x,character.only = TRUE))
   {
     install.packages(x,dep=TRUE)
@@ -58,7 +57,7 @@ dados$LN_HD <- log(dados$HD)
 
 # dplyr
 # Com o dplyr pode-se criar diversas variaveis com um unico comando
-dados <- mutate(dados, DAP=CAP/pi, INV_DAP=1/DAP, LN_HT=log(HT), Ln_HD=log(HD))
+dados <- mutate(dados, DAP=CAP/pi, INV_DAP=1/DAP, LN_HT=log(HT), LN_HD=log(HD))
 
 # 4) Ajuste de uma equacao por uma chave ####
 # Ln(Ht) = b0 + b1*((1/DAP)  + b2 * Ln(Hd)
@@ -197,88 +196,95 @@ tibble_talh <- dados %>% # definicao do df
   group_by(TALHAO) %>% # definicao dos grupos
   nest  %>% # com tidyr::nest agrupamos os dados a mais em uma lista, resumindo os dados ( a funcao unnest desfaz este ato)
   mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP + LN_HD, data =.)), # a funcao purrr::map aplica uma funcao para cada elemento da lista
-  Coefs = map(Reg, tidy) , # a funcao broom:tidy nos da os coeficientes e algumas estatisticas adicionais
-         Glance = map(Reg, glance) ) # a funcao broom::glance oferece as estatisticas R2 ajustato e sigma, entre outras. Iremos remover as outras, mas sinta-se livre pra manter as variaveis desejadas
+  Coefs  = map(Reg, tidy) , # a funcao broom:tidy nos da os coeficientes e algumas estatisticas adicionais
+  Qualid = map(Reg, glance), # a funcao broom::glance oferece as estatisticas R2 ajustato e sigma, entre outras. Iremos remover as outras, mas sinta-se livre pra manter as variaveis desejadas
+  Res    = map(Reg, resid) ) # a funcao broom::resid cria um vetor com os valores residuais do ajuste
+
+# podemos visualizar os resultados com tidyr::unnest
+
+tibble_talh %>% 
+  unnest(Coefs) 
+
+tibble_talh %>% 
+  unnest(Qualid, .drop = T) 
 
 # Porem, glance e tidy geram muitas variaveis que geralmente nao sao utilizadas
-# se quisermos apenas os coeficientes, R2 ajustado e o erro-padrao, podemos obtelos da seguinte forma:
+# se quisermos apenas os coeficientes, R2 ajustado e o erro-padrao
+# outro problema e que tidy nos da os coeficientes organizados por fator
+# se quisermos os coeficientes organizados por coluna, podemos utilizar spread para transformar os niveis do fator em colunas
 
-tibble_talh <- dados %>% # definicao do df
-  group_by(TALHAO) %>% # definicao dos grupos
-  nest  %>% # com tidyr::nest agrupamos os dados a mais em uma lista, resumindo os dados ( a funcao unnest desfaz este ato)
-  mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP + LN_HD, data =.)), # a funcao purrr::map aplica uma funcao para cada elemento da lista
-         Coefs = map(Reg, 
-                     function(x) tibble(term=tidy(x)$term,  # coluna que contem os nomes dos coeficientes
-                                        estimate=tidy(x)$estimate ) ), # coluna que contem os valores dos coeficientes
-         Glance = map(Reg, 
-                      function(x) tibble( Rsqr=glance(x)$adj.r.squared, # coluna do R2 ajustado
-                                          Std.Error=glance(x)$sigma )    )      ) # coluna do erro-padrao
+# Podemos obte-los da seguinte forma:
+
+tibble_talh %>% 
+  unnest(Coefs) %>% 
+  select(TALHAO,b = term, estimate) %>% 
+  mutate(b = factor(b, labels= 0:2  ) ) %>% # mudamos os nomes dos coeficientes para bn
+  spread( b, estimate,sep="" )     # com spread deixamos a tabela horizontal, colocando cada coeficiente em uma coluna
 
 
-# Porem, ainda temos o problema d eque tidy nos da os coeficientes organizados por fator
-# e quisermos os coeficientes organizados por coluna, podemos utilizar spread dentro da funcao criada anteriormente
+tibble_talh %>% 
+  unnest(Qualid, .drop=T) %>% 
+  select(TALHAO, Rsqr = adj.r.squared, Std.Error = sigma) 
 
-tibble_talh <- dados %>% # definicao do df
-  group_by(TALHAO) %>% # definicao dos grupos
-  nest  %>% # com tidyr::nest agrupamos os dados a mais em uma lista, resumindo os dados ( a funcao unnest desfaz este ato)
-  mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP + LN_HD, data =.)), # a funcao purrr::map aplica uma funcao para cada elemento da lista
-         Coefs = map(Reg, 
-                     function(x) 
-                       tibble(b=tidy(x)$term, 
-                              estimate=tidy(x)$estimate ) %>% 
-                       mutate(b = factor(b, labels=0:(length(b)-1) ) ) %>% # mudamos os nomes dos coeficientes para bn
-                       spread(                    # com spread deixamos a tabela horizontal, colocando cada coeficiente em uma coluna
-                         b, estimate,sep="" # variaveis que seram utilizadas no spread
-                       )  ),
-         Glance = map(Reg, 
-                      function(x) tibble( Rsqr=glance(x)$adj.r.squared, 
-                                          Std.Error=glance(x)$sigma )    ),
-         Res = map(Reg, resid) ) # a funcao resid cria um vetor com os valores residuais do ajuste
+# podemos entao salvar versoes modificadas das funcoes tidy e glance, 
+# que fazem estas operacoes realizadas anteriormente,
+# e utiliza-las na hora de criar as variaveis, com purrr::map
 
-# ou, se salvarmos esta funcao em um objeto separado
-
-tidys <- function(x) 
-{
-  tibble(b=tidy(x)$term, 
+tidy_ <- function(x){
+  tibble(b=tidy(x)$term, # criamos um data frame que tem apenas as colunas dos betas e seus valores
          estimate=tidy(x)$estimate ) %>% 
     mutate(b = factor(b, labels=0:(length(b)-1) ) ) %>% # mudamos os nomes dos coeficientes para bn
-    spread(                    # com spread deixamos a tabela horizontal, colocando cada coeficiente em uma coluna
-      b, estimate,sep="" # variaveis que seram utilizadas no spread
-    ) 
+    spread( b, estimate,sep="" )     # com spread deixamos a tabela horizontal, colocando cada coeficiente em uma coluna
+  
 }
 
+glance_ <- function(x){ 
+  
+  tibble( Rsqr=glance(x)$adj.r.squared, # criamos um data table que tem apenas as variaveis R quadrado ajustado e erro padrao
+          Std.Error=glance(x)$sigma ) }
 
 tibble_talh <- dados %>% # definicao do df
   group_by(TALHAO) %>% # definicao dos grupos
   nest  %>% # com tidyr::nest agrupamos os dados a mais em uma lista, resumindo os dados ( a funcao unnest desfaz este ato)
   mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP + LN_HD, data =.)), # a funcao purrr::map aplica uma funcao para cada elemento da lista
-         Coefs = map(Reg, tidys ),
-         Glance = map(Reg, 
-                      function(x) tibble( Rsqr=glance(x)$adj.r.squared, 
-                                          Std.Error=glance(x)$sigma )    ),
-         Res = map(Reg, resid) ) # a funcao resid cria um vetor com os valores residuais do ajuste
+         Coefs = map(Reg, tidy_ ),
+         Qualid = map(Reg, glance_ ),
+         Res = map(Reg, resid) ) # a funcao broom::resid cria um vetor com os valores residuais do ajuste
 
 # a vantagem deste metodo e que nao e necessaria a definicao dos nomes de cada coeficiente
 # deixando a funcao automatizada para qualquer modelo, com n coeficientes
 
 tibble_talh
+
 # Observe como cada coluna é uma lista que agrupa diferentes variaveis, com dimensoes diferentes
 # a informacao de cada parcela esta agrupada neste objeto
 # data tem as informacoes basicas das parcelas (DAP, HT, etc) comprimidos em uma coluna,
 # Reg tem objetos de regressao de cada ajuste de cada talhao,
 # Coefs tem os coeficientes e mais algumas variaveis de qualidade do ajuste de cada talhao.
-# Glance tem variaveis de qualidade do ajuste de cada talhao,
+# Qualid tem variaveis de qualidade do ajuste de cada talhao,
 # e uma coluna dos residuos de cada ajuste
 
 # Assim, se quisermos obter a tabela de coeficientes e qualidade de ajuste,
 # podemos utilizar unnest
-tibble_talh %>%
-  unnest(Coefs, Glance, .drop=T) # O argumento .drop controla se as colunas lista adicionais devem ser mantidas ou nao
+tibble_talh %>% unnest(Coefs, Qualid, .drop=F) # O argumento .drop controla se as colunas lista adicionais devem ser mantidas ou nao
+
+
+tibble_talh %>% unnest(Coefs, Qualid, .drop=T) # O argumento .drop controla se as colunas lista adicionais devem ser mantidas ou nao
 
 # ou uma tabela contendo os dados originais e os residuos
 tibble_talh %>%
   unnest(data, Res)
 
+# podemos fazer de forma direta tambem
+
+dados %>% # definicao do df
+  group_by(TALHAO) %>% # definicao dos grupos
+  nest  %>% # com tidyr::nest agrupamos os dados a mais em uma lista, resumindo os dados ( a funcao unnest desfaz este ato)
+  mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP + LN_HD, data =.)), # a funcao purrr::map aplica uma funcao para cada elemento da lista
+         Coefs = map(Reg, tidy_ ),
+         Qualid = map(Reg, glance_ ),
+         Res = map(Reg, resid) ) %>% 
+  unnest(Coefs, .drop=T)
 
 # 4.5) Comparar as tabelas geradas ####
 
@@ -360,63 +366,52 @@ tibble_talh_par <- dados %>% # definicao do df
   nest  %>% # com tidyr::nest agrupamos os dados a mais em uma lista, resumindo os dados ( a funcao unnest desfaz este ato)
   mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP, data =.)),
          Coefs = map(Reg, tidy) , # a funcao broom:tidy nos da os coeficientes e algumas estatisticas adicionais
-         Glance = map(Reg, glance) ) # a funcao broom::glance oferece as estatisticas R2 ajustato e sigma, entre outras. Iremos remover as outras, mas sinta-se livre pra manter as variaveis desejadas
+         Qualid = map(Reg, glance),# a funcao broom::glance oferece as estatisticas R2 ajustato e sigma, entre outras. Iremos remover as outras, mas sinta-se livre pra manter as variaveis desejadas
+         Res = map(Reg, resid)  ) 
+
 
 # Porem, glance e tidy geram muitas variaveis que geralmente nao sao utilizadas
 # se quisermos apenas os coeficientes, R2 ajustado e o erro-padrao, podemos obtelos da seguinte forma:
 
-tibble_talh_par <- dados %>% # definicao do df
-  group_by(TALHAO, PARCELA) %>% # definicao dos grupos
-  nest  %>% # com tidyr::nest agrupamos os dados a mais em uma lista, resumindo os dados ( a funcao unnest desfaz este ato)
-  mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP, data =.)),
-         Coefs = map(Reg, 
-                     function(x) tibble(term=tidy(x)$term,  # coluna que contem os nomes dos coeficientes
-                                        estimate=tidy(x)$estimate ) ), # coluna que contem os valores dos coeficientes
-         Glance = map(Reg, 
-                      function(x) tibble( Rsqr=glance(x)$adj.r.squared, # coluna do R2 ajustado
-                                          Std.Error=glance(x)$sigma )    )      ) # coluna do erro-padrao
-
 # Porem, ainda temos o problema d eque tidy nos da os coeficientes organizados por fator
 # e quisermos os coeficientes organizados por coluna, podemos utilizar spread dentro da funcao criada anteriormente
 
-tibble_talh_par <- dados %>% # definicao do df
-  group_by(TALHAO, PARCELA) %>% # definicao dos grupos
-  nest  %>% # com tidyr::nest agrupamos os dados a mais em uma lista, resumindo os dados ( a funcao unnest desfaz este ato)
-  mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP, data =.)),
-         Coefs = map(Reg, 
-                     function(x) 
-                       tibble(b=tidy(x)$term, 
-                              estimate=tidy(x)$estimate ) %>% 
-                       mutate(b = factor(b, labels=0:(length(b)-1) ) ) %>% # mudamos os nomes dos coeficientes para bn
-                       spread(                    # com spread deixamos a tabela horizontal, colocando cada coeficiente em uma coluna
-                         b, estimate,sep="" # variaveis que seram utilizadas no spread
-                       )  ),
-         Glance = map(Reg, 
-                      function(x) tibble( Rsqr=glance(x)$adj.r.squared, 
-                                          Std.Error=glance(x)$sigma )    ),
-         Res = map(Reg, resid) ) # a funcao resid cria um vetor com os valores residuais do ajuste
+# Podemos obte-los da seguinte forma:
 
-# ou, se salvarmos esta funcao mais complexa separadamente,
+tibble_talh_par %>% 
+  unnest(Coefs) %>% 
+  select(TALHAO,PARCELA,b = term, estimate) %>% 
+  mutate(b = factor(b, labels= 0:1  ) ) %>% # mudamos os nomes dos coeficientes para bn
+  spread( b, estimate,sep="" )     # com spread deixamos a tabela horizontal, colocando cada coeficiente em uma coluna
 
-tidys <- function(x) 
-{
-  tibble(b=tidy(x)$term, 
+
+tibble_talh_par %>% 
+  unnest(Qualid, .drop=T) %>% 
+  select(TALHAO, PARCELA, Rsqr = adj.r.squared, Std.Error = sigma) 
+
+# podemos entao salvar versoes modificadas das funcoes tidy e glance, 
+# que fazem estas operacoes realizadas anteriormente,
+# e utiliza-las na hora de criar as variaveis, com purrr::map
+
+tidy_ <- function(x){
+  tibble(b=tidy(x)$term, # criamos um data frame que tem apenas as colunas dos betas e seus valores
          estimate=tidy(x)$estimate ) %>% 
     mutate(b = factor(b, labels=0:(length(b)-1) ) ) %>% # mudamos os nomes dos coeficientes para bn
-  spread(                    # com spread deixamos a tabela horizontal, colocando cada coeficiente em uma coluna
-          b, estimate,sep="" # variaveis que seram utilizadas no spread
-                             ) 
-  }
+    spread( b, estimate,sep="" )     # com spread deixamos a tabela horizontal, colocando cada coeficiente em uma coluna
+  
+}
 
+glance_ <- function(x){ 
+  
+  tibble( Rsqr=glance(x)$adj.r.squared, # criamos um data table que tem apenas as variaveis R quadrado ajustado e erro padrao
+          Std.Error=glance(x)$sigma ) }
 
 tibble_talh_par <- dados %>% # definicao do df
   group_by(TALHAO, PARCELA) %>% # definicao dos grupos
   nest  %>% # com tidyr::nest agrupamos os dados a mais em uma lista, resumindo os dados ( a funcao unnest desfaz este ato)
-  mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP, data =.)),
-         Coefs = map(Reg, tidys ),
-         Glance = map(Reg, 
-                      function(x) tibble( Rsqr=glance(x)$adj.r.squared, 
-                                          Std.Error=glance(x)$sigma )    ),
+  mutate(Reg = map(data, ~lm(LN_HT ~ INV_DAP, data =.) ),
+         Coefs  = map(Reg, tidy_   ),
+         Qualid = map(Reg, glance_ ),
          Res = map(Reg, resid) ) # a funcao resid cria um vetor com os valores residuais do ajuste
 
 # a vantagem deste metodo e que nao e necessaria a definicao dos nomes de cada coeficiente
@@ -429,13 +424,13 @@ tibble_talh_par
 # data tem as informacoes basicas das parcelas (DAP, HT, etc) comprimidos em uma coluna,
 # Reg tem objetos de regressao de cada ajuste de cada parcela,
 # Coefs tem os coeficientes e mais algumas variaveis de qualidade do ajuste de cada parcela.
-# Glance tem variaveis de qualidade do ajuste de cada parcela,
+# Qualid tem variaveis de qualidade do ajuste de cada parcela,
 # e uma coluna dos residuos de cada ajuste
 
 # Assim, se quisermos obter a tabela de coeficientes e qualidade de ajuste,
 # podemos utilizar unnest
 tibble_talh_par %>%
-unnest(Coefs, Glance, .drop=T) # O argumento .drop controla se as colunas lista adicionais devem ser mantidas ou nao
+unnest(Coefs, Qualid, .drop=T) # O argumento .drop controla se as colunas lista adicionais devem ser mantidas ou nao
 
 # ou uma tabela contendo os dados originais e os residuos
 tibble_talh_par %>%
