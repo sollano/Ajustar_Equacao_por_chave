@@ -80,22 +80,18 @@ head(dados)
 ##
 ## ## 4.1) R base ####
 
-## Cria-se um objeto que contem apenas as variáveis da regressão
-## Primeiramente deve se inserir o y, e entao, x1, x2... xn
-aux1 <- dados[,c("LN_HT", "INV_DAP", "LN_HD")]
-
 ## Utilizando a função by, executa-se a regressão linear
 ## no primeiro argumento insere-se as variáveis,
 ## no segundo argumento uma variável classificatoria,
-## e no terceiro argumento a função a ser executada (lm)
-reg_rbase_talh <- by(aux1, dados$TALHAO, lm)
+## no terceiro argumento a função a ser executada (lm),
+## e em seguida indica-se o argumento "formula", e insere-se
+## o modelo que será utilizado:
+reg_rbase_talh <- by(dados, dados$TALHAO, lm, formula = LN_HT ~ INV_DAP + LN_HD )
 
-## O arquivo gerado pela função by comporta-se como uma lista,
-## por isso e necessário utilziar o cbind para unir os seus dados
-## note que so e possivel pedir o sumario individual de cada observação
-aux2 <- data.frame(cbind(reg_rbase_talh))
-summary(aux2)
-summary(aux2[1,1]$`3654`)
+## O arquivo gerado pela função by comporta-se como uma lista.
+## note que só é possível pedir o sumario individual de cada observação:
+summary(reg_rbase_talh)
+summary(reg_rbase_talh$`3654`)
 
 ## Criação da tabela de coeficientes
 
@@ -119,7 +115,7 @@ tab_rbase_talh <- cbind(TALHAO = rownames(tab_rbase_talh),as.data.frame(tab_rbas
 ## Remoção dos rownames
 rownames(tab_rbase_talh) <- NULL
 
-head(tab_rbase_talh)
+tab_rbase_talh
 
 ## ## 4.2) dplyr  ####
 
@@ -134,7 +130,7 @@ reg_dplyr_talh <- dados %>% # definição do df a ser utilizado
   do(Reg = lm(LN_HT ~ INV_DAP + LN_HD, data =.)) # modelo linear
   
 ## o objeto gerado pelo dplyr e mais organizado,
-## e contem a sua chave como primeira coluna, e as regressoes como segunda coluna
+## e contém a sua chave como primeira coluna, e as regressoes como segunda coluna
 ## note que so e possivel pedir o sumario individual de cada observação
 reg_dplyr_talh
 reg_dplyr_talh$Reg
@@ -223,9 +219,10 @@ all.equal(tab_nlme_talh, tab_dplyr_talh)
 dados2 <- dados
 dados2$TALHAO_PAR <- paste(dados2$TALHAO, dados2$PARCELA, sep='_')
 
-aux1 <- dados[,c("LN_HT", "INV_DAP")]
-reg_rbase_talh_par <- by(aux1, dados2$TALHAO_PAR, lm)
-aux2 <- data.frame(cbind(reg_rbase_talh_par))
+reg_rbase_talh_par <- by(dados2, dados2$TALHAO_PAR, lm, formula = LN_HT ~ INV_DAP)
+summary(reg_rbase_talh_par)
+summary(reg_rbase_talh_par$`3654_101`)
+
 
 ## Criação da tabela de coeficientes
 ## Como agora utiliza-se um modelo com 2 coeficientes, o terceiro argumento
